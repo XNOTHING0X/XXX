@@ -5,11 +5,12 @@ local RunService = game:GetService("RunService")
 local localPlayer = Players.LocalPlayer
 local pushingEnabled = false
 local walkFlingEnabled = false
-local power = 100
+local touchPower = 100 
+local walkPower = 100  
 local character, humanoidRootPart
 local function updateCharacter(newCharacter)
     character = newCharacter
-    humanoidRootPart = character:WaitForChild("HumanoidRootPart", 5)
+    humanoidRootPart = character and character:WaitForChild("HumanoidRootPart", 5)
 end
 if localPlayer.Character then
     updateCharacter(localPlayer.Character)
@@ -47,12 +48,15 @@ local function createGlowEffect(startPos, endPos)
 end
 local function pushObject(hit)
     if pushingEnabled and hit and hit:IsA("BasePart") and hit ~= humanoidRootPart then
-        local bodyVelocity = Instance.new("BodyVelocity")
-        bodyVelocity.Velocity = humanoidRootPart.CFrame.LookVector * power
-        bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-        bodyVelocity.Parent = hit
-        game:GetService("Debris"):AddItem(bodyVelocity, 0.1)
-        createGlowEffect(humanoidRootPart.Position, hit.Position)
+        local targetCharacter = hit.Parent
+        if targetCharacter and Players:GetPlayerFromCharacter(targetCharacter) then
+            local bodyVelocity = Instance.new("BodyVelocity")
+            bodyVelocity.Velocity = humanoidRootPart.CFrame.LookVector * touchPower
+            bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+            bodyVelocity.Parent = hit
+            game:GetService("Debris"):AddItem(bodyVelocity, 0.2) 
+            createGlowEffect(humanoidRootPart.Position, hit.Position)
+        end
     end
 end
 local function toggleTouchFling()
@@ -75,15 +79,12 @@ local function toggleWalkFling()
     })
     if not walkFlingEnabled then return end
     local root = getRoot(character)
-    local vel, movel = nil, 0.1
+    if not root then return end
     while walkFlingEnabled and character and character.Parent and root and root.Parent do
-        vel = root.Velocity
-        root.Velocity = vel * power + Vector3.new(0, power, 0)
+        local vel = root.Velocity
+        root.Velocity = vel + (humanoidRootPart.CFrame.LookVector * walkPower + Vector3.new(0, walkPower * 0.5, 0))
         RunService.RenderStepped:Wait()
-        root.Velocity = vel
-        RunService.Stepped:Wait()
-        root.Velocity = vel + Vector3.new(0, movel, 0)
-        movel = movel * -1
+        root.Velocity = vel 
         RunService.Heartbeat:Wait()
     end
 end
@@ -113,11 +114,20 @@ Tabs.Main:AddKeybind("TouchFlingKeybind", {
 })
 Tabs.Main:AddInput("TouchPowerInput", {
     Title = "",
-    Default = tostring(power),
-    Placeholder = "Enter Power",
+    Default = tostring(touchPower),
+    Placeholder = "Enter Power (1-1000)",
     Numeric = true,
     Callback = function(value)
-        power = tonumber(value) or power
+        local newPower = tonumber(value)
+        if newPower and newPower >= 1 and newPower <= 1000 then
+            touchPower = newPower
+        else
+            Fluent:Notify({
+                Title = "NOTHING X HUB",
+                Content = "Invalid power value! Use a number between 1 and 1000.",
+                Duration = 3
+            })
+        end
     end
 })
 Tabs.Main:AddSection("Walk Fling")
@@ -129,30 +139,38 @@ Tabs.Main:AddKeybind("WalkFlingKeybind", {
 })
 Tabs.Main:AddInput("WalkPowerInput", {
     Title = "",
-    Default = tostring(power),
-    Placeholder = "Enter Power",
+    Default = tostring(walkPower),
+    Placeholder = "Enter Power (1-1000)",
     Numeric = true,
     Callback = function(value)
-        power = tonumber(value) or power
+        local newPower = tonumber(value)
+        if newPower and newPower >= 1 and newPower <= 1000 then
+            walkPower = newPower
+        else
+            Fluent:Notify({
+                Title = "NOTHING X HUB",
+                Content = "Invalid power value! Use a number between 1 and 1000.",
+                Duration = 3
+            })
+        end
     end
 })
 Tabs.Main:AddSection("+")
-local Toggle = Tabs.Main:AddToggle("antiflingtog", {Title = "Anti Fling", Default = false})
+local Toggle = Tabs.Main:AddToggle("antiflingtog", { Title = "Anti Fling", Default = false })
 local connection
 Toggle:OnChanged(function(value)
     if value then
-        connection = game:GetService("RunService").Stepped:Connect(function()
-            local localPlayer = game:GetService("Players").LocalPlayer
+        connection = RunService.Stepped:Connect(function()
             local localCharacter = localPlayer.Character
             if not localCharacter or not localCharacter.PrimaryPart then return end
             local localPosition = localCharacter.PrimaryPart.Position
-            for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+            for _, player in pairs(Players:GetPlayers()) do
                 if player ~= localPlayer and player.Character and player.Character.PrimaryPart then
                     local distance = (player.Character.PrimaryPart.Position - localPosition).Magnitude
-                    if distance <= 10 then 
+                    if distance <= 10 then
                         for _, v in pairs(player.Character:GetDescendants()) do
                             if v:IsA("BasePart") then
-                                v.CanCollide = false 
+                                v.CanCollide = false
                             end
                         end
                     end
@@ -164,11 +182,11 @@ Toggle:OnChanged(function(value)
             connection:Disconnect()
             connection = nil
         end
-        for _, player in pairs(game:GetService("Players"):GetPlayers()) do
-            if player ~= game:GetService("Players").LocalPlayer and player.Character then
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= localPlayer and player.Character then
                 for _, v in pairs(player.Character:GetDescendants()) do
                     if v:IsA("BasePart") then
-                        v.CanCollide = true 
+                        v.CanCollide = true
                     end
                 end
             end
@@ -178,6 +196,7 @@ end)
 Window:SelectTab(1)
 local mouse = localPlayer:GetMouse()
 mouse.Button1Down:Connect(function()
-    local target = mouse.Target
-    pushObject(target)
+    if character and humanoidRootPart then
+        pushObject(mouse.Target)
+    end
 end)
