@@ -137,56 +137,42 @@ Tabs.Main:AddInput("WalkPowerInput", {
     end
 })
 Tabs.Main:AddSection("+")
-local Toggle = Tabs.Main:AddToggle("antiflingtog", { Title = "Anti Fling", Default = false })
+local Toggle = Tabs.Main:AddToggle("antiflingtog", {Title = "Anti Fling", Default = false})
 local connection
-local characterCache = {}
 Toggle:OnChanged(function(value)
     if value then
-        characterCache = {}
-        connection = RunService.Stepped:Connect(function()
-            for _, player in ipairs(Players:GetPlayers()) do
-                if player ~= LocalPlayer and player.Character then
-                    if not characterCache[player] then
-                        for _, v in ipairs(player.Character:GetDescendants()) do
+        connection = game:GetService("RunService").Stepped:Connect(function()
+            local localPlayer = game:GetService("Players").LocalPlayer
+            local localCharacter = localPlayer.Character
+            if not localCharacter or not localCharacter.PrimaryPart then return end
+            local localPosition = localCharacter.PrimaryPart.Position
+            for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+                if player ~= localPlayer and player.Character and player.Character.PrimaryPart then
+                    local distance = (player.Character.PrimaryPart.Position - localPosition).Magnitude
+                    if distance <= 10 then 
+                        for _, v in pairs(player.Character:GetDescendants()) do
                             if v:IsA("BasePart") then
-                                v.CanCollide = false
+                                v.CanCollide = false 
                             end
                         end
-                        characterCache[player] = true
                     end
                 end
             end
-        end)
-        Players.PlayerRemoving:Connect(function(player)
-            characterCache[player] = nil
-        end)
-        Players.PlayerAdded:Connect(function(player)
-            player.CharacterAdded:Connect(function(character)
-                if Toggle.Value then
-                    for _, v in ipairs(character:GetDescendants()) do
-                        if v:IsA("BasePart") then
-                            v.CanCollide = false
-                        end
-                    end
-                    characterCache[player] = true
-                end
-            end)
         end)
     else
         if connection then
             connection:Disconnect()
             connection = nil
         end
-        for player, _ in pairs(characterCache) do
-            if player ~= LocalPlayer and player.Character then
-                for _, v in ipairs(player.Character:GetDescendants()) do
+        for _, player in pairs(game:GetService("Players"):GetPlayers()) do
+            if player ~= game:GetService("Players").LocalPlayer and player.Character then
+                for _, v in pairs(player.Character:GetDescendants()) do
                     if v:IsA("BasePart") then
-                        v.CanCollide = true
+                        v.CanCollide = true 
                     end
                 end
             end
         end
-        characterCache = {}
     end
 end)
 Window:SelectTab(1)
